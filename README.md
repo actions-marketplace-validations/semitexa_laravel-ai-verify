@@ -206,7 +206,7 @@ When stdout is not a terminal, which is how agents run commands, the output is N
 per line, results streamed as each check finishes, and the verdict always last.
 
 ```json
-{"kind":"summary","source":"dirty (default)","requested_scope":"standard","effective_scope":"standard","changed_files":1,"targets":4,"tool":"semitexa/laravel-ai-verify 0.5.0"}
+{"kind":"summary","source":"dirty (default)","requested_scope":"standard","effective_scope":"standard","changed_files":1,"targets":4,"tool":"semitexa/laravel-ai-verify 0.5.1"}
 {"kind":"file","file_kind":"listener","path":"app/Listeners/NotifySubscribers.php","status":"M"}
 {"kind":"target","id":"artisan:events","check":"artisan","reason":"event → listener map resolved — listener changed","triggered_by":["app/Listeners/NotifySubscribers.php"],"required":true}
 {"kind":"result","id":"artisan:events","check":"artisan","status":"pass","exit_code":0,"signal":"Event → listener map resolved","required":true,"duration_ms":230}
@@ -295,8 +295,9 @@ php artisan ai:verify --git-ref=origin/main --github
 ### Message vs diff
 
 A receipt proves the checks passed. It does not prove the change is the one the commit message
-describes. In our own demo app an agent committed `Limit contact name to 250 chars`, and the diff
-limited the **email** instead. Tests passed, the trailer was earned, and the claim was false.
+describes. While we tested the GitHub Action, Claude Code committed `Limit contact name to 250 chars`
+in our test app. Its edit replaced `max:255` with `max:250`, but the name limit was 200, so it
+changed the **email** rule. Tests passed, the trailer was earned, and the claim was false.
 
 So the hook and `--range` also read each commit's subject against its diff:
 
@@ -307,14 +308,16 @@ ai-verify: the commit message may not describe this change:
 ```
 
 - **What it flags.** A word in the subject names something in a changed code file, and that line
-  is left alone while a line of the same shape right next to it changed. That is the wrong-line
-  slip: `'name' => [...]` untouched, its twin `'email' => [...]` edited. It also flags a number in
-  the subject (`250`) that no added line contains.
-- **What it ignores.** Words the changed code never mentions, prose files, JSON, templates and
-  tests, merges, reverts, and commits touching more than 25 files. Across about 930 commits from
-  five real repositories it flagged 23, about 2.5%.
-- **Where it shows.** The git hook prints it on stderr before the commit exists, so the agent can
-  fix it right away. In CI each mismatch becomes a warning annotation on the changed line and a
+  is left alone while a line of the same shape within 12 lines of it changed. That is the
+  wrong-line slip: `'name' => [...]` untouched, its twin `'email' => [...]` edited. It also flags a
+  number in the subject that no added line contains, such as `200` when the diff writes `250`.
+- **What it ignores.** Words the changed code never mentions; prose, JSON, YAML, Twig and HTML
+  files; tests; merges, reverts, and commits touching more than 25 files. PHP files, Blade views
+  included, are read. Across 937 commits from five of our PHP repositories it flagged 23 (2.5%),
+  one of them the commit above.
+- **Where it shows.** When the message comes with `git commit -m` or `-F`, as agents commit, the
+  git hook prints it on stderr before the commit exists, so the agent can fix it right away. A
+  message typed in the editor is checked in CI. In CI each mismatch becomes a warning annotation on the changed line and a
   "Message vs diff" list in the job summary.
 - **How strict.** `--claims=warn` (default) only reports. `--claims=fail` fails `--range`.
   `--claims=off` turns it off.
@@ -346,7 +349,7 @@ jobs:
       - run: composer install --no-interaction --no-progress --prefer-dist
       - run: cp .env.example .env && php artisan key:generate
 
-      - uses: semitexa/laravel-ai-verify@v0.5.0
+      - uses: semitexa/laravel-ai-verify@v0.5.1
         with:
           require: ai             # commits co-authored by an AI agent must be verified
 ```

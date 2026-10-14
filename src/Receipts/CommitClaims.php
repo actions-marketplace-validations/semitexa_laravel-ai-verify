@@ -8,9 +8,10 @@ use Semitexa\LaravelAiVerify\Support\ProcessRunner;
 
 /**
  * Does a commit do what its subject says? A receipt proves the checks passed,
- * not that the change is the one the message claims. An agent once committed
- * "Limit contact name to 250 chars" with a diff that limited the email
- * instead: the tests passed, the trailer was earned, the claim was false.
+ * not that the change is the one the message claims. Testing this package's
+ * Action, Claude Code committed "Limit contact name to 250 chars" with a diff
+ * that limited the email instead: the tests passed, the trailer was earned,
+ * the claim was false.
  *
  * Two deterministic signals, both advisory:
  *
@@ -36,8 +37,9 @@ final class CommitClaims
     private const TWIN = 0.8;
 
     /**
-     * Where a named thing can be missed: application code. Prose, data files,
-     * templates and tests are full of look-alike lines and only add noise.
+     * Where a named thing can be missed: application code, Blade views included.
+     * Prose, data files, Twig/HTML templates and tests are full of look-alike
+     * lines and only add noise.
      */
     private const CODE = '/\\.(php|js|mjs|cjs|ts|tsx|jsx|vue|svelte|py|rb|go|java|kt|cs|rs|swift|sql)$/i';
 
