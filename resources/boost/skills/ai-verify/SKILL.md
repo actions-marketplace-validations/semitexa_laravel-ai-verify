@@ -19,6 +19,7 @@ description: Verify a Laravel change before calling it done, and orient in an un
 - Every run writes a receipt (`{"kind":"receipt","id":"rcpt-…"}`). `php artisan ai:verify:receipt` shows whether it still **holds**: it is intact, the verdict was `pass`, and nothing changed since. Check it before claiming the work is verified.
 - Commit exactly what you verified: `git add -A` after a passing run. With the git hook installed (`ai:verify:install --git-hook`), the commit gets an `AI-Verify: pass rcpt-… tree=…` trailer, and CI compares that tree with the commit's own.
 - If the hook prints `no AI-Verify trailer — this commit is not the state … verified`, it lists the files that differ. Stage them, or re-run `ai:verify` on what you commit.
+- If the hook prints `the commit message may not describe this change`, the subject names something (a field, a method) whose line you did not change, while you changed a line just like it. Either you edited the wrong line, or the message is wrong. Fix the one that is wrong and amend.
 - To stamp a commit you already made: `php artisan ai:verify --git-ref=HEAD~1`, then `git commit --amend --no-edit`.
 
 ## Choosing the input

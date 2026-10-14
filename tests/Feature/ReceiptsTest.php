@@ -7,6 +7,7 @@ namespace Semitexa\LaravelAiVerify\Tests\Feature;
 use Illuminate\Support\Facades\Artisan;
 use Orchestra\Testbench\TestCase;
 use Semitexa\LaravelAiVerify\AiVerifyServiceProvider;
+use Semitexa\LaravelAiVerify\Receipts\CommitClaims;
 use Semitexa\LaravelAiVerify\Receipts\Receipts;
 use Semitexa\LaravelAiVerify\Support\GitTree;
 use Semitexa\LaravelAiVerify\Support\ProcessRunner;
@@ -133,6 +134,38 @@ final class ReceiptsTest extends TestCase
 
         $this->assertSame(0, Artisan::call('ai:verify:receipt', ['--commit' => 'HEAD~2', '--json' => true]));
         $this->assertSame(0, Artisan::call('ai:verify:receipt', ['--range' => 'HEAD~3..HEAD', '--require' => 'none']));
+    }
+
+    public function test_ci_flags_a_commit_whose_subject_names_a_line_it_did_not_change(): void
+    {
+        $rules = static fn (int $name, int $email) => "<?php\n\nnamespace App;\n\nclass ContactRules\n{\n    public const RULES = [\n"
+            ."        'name' => ['required', 'string', 'max:{$name}'],\n"
+            ."        'email' => ['required', 'email', 'max:{$email}'],\n"
+            ."    ];\n}\n";
+        file_put_contents($this->dir.'/app/ContactRules.php', $rules(200, 255));
+        $this->git('add -A && git commit -qm "Add contact rules"');
+
+        // What an agent committed in the demo app: the subject says name, the diff limits the email.
+        file_put_contents($this->dir.'/app/ContactRules.php', $rules(200, 250));
+        $this->git('add -A');
+        $staged = (new CommitClaims(new ProcessRunner($this->dir)))->staged("Limit contact name to 250 chars\n\n# Please enter the commit message\n");
+        $this->assertSame(['name'], array_column($staged, 'term'), 'the git hook sees it before the commit exists');
+        $this->git('commit -qm "Limit contact name to 250 chars"');
+
+        $this->assertSame(0, Artisan::call('ai:verify:receipt', ['--range' => 'HEAD~2..HEAD', '--require' => 'none', '--json' => true]), 'warn is the default');
+        $range = json_decode(Artisan::output(), true);
+        $this->assertSame(1, $range['mismatched']);
+        $this->assertSame([], $range['details'][1]['claims'], 'the commit that adds the file says what it does');
+        $claim = $range['details'][0]['claims'][0];
+        $this->assertSame(['term', 'name', 'app/ContactRules.php', 8], [$claim['kind'], $claim['term'], $claim['path'], $claim['line']]);
+        $this->assertSame(['path' => 'app/ContactRules.php', 'line' => 9], array_intersect_key($claim['changed'], ['path' => 0, 'line' => 0]));
+
+        Artisan::call('ai:verify:receipt', ['--range' => 'HEAD~2..HEAD', '--require' => 'none', '--github' => true]);
+        $this->assertStringContainsString('::warning file=app/ContactRules.php,line=9,title=Commit ', Artisan::output());
+
+        $this->assertSame(1, Artisan::call('ai:verify:receipt', ['--range' => 'HEAD~2..HEAD', '--require' => 'none', '--claims' => 'fail']));
+        Artisan::call('ai:verify:receipt', ['--range' => 'HEAD~2..HEAD', '--require' => 'none', '--claims' => 'off', '--json' => true]);
+        $this->assertSame(0, json_decode(Artisan::output(), true)['mismatched']);
     }
 
     public function test_amending_after_verification_makes_the_trailer_stale(): void
