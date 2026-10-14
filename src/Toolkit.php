@@ -20,7 +20,7 @@ use Semitexa\LaravelAiVerify\Verify\Executor;
  */
 final class Toolkit
 {
-    public const VERSION = '0.4.3';
+    public const VERSION = '0.5.0';
 
     public const HOMEPAGE = 'https://semitexa.com';
 

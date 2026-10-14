@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.0 - 2026-10-14
+
+- **Message vs diff.** A receipt proves the checks passed, not that the commit does what its message says. An agent in our demo app committed "Limit contact name to 250 chars" with a diff that limited the email. The tests passed and the commit was stamped.
+  - The commit subject is now read against the diff. A subject word that names a line in a changed code file is flagged when that line is unchanged and a line of the same shape next to it changed (`'name' => [...]` left alone, `'email' => [...]` edited). A number in the subject that no added line contains is flagged too.
+  - Prose, JSON, templates and tests are not searched; merges, reverts and commits of more than 25 files are skipped. Across about 930 commits from five real repositories it flagged 23, about 2.5%.
+  - The `prepare-commit-msg` hook prints the warning on stderr before the commit exists.
+  - `ai:verify:receipt --range` adds `claims` per commit, a warning annotation on the changed line with `--github`, and a "Message vs diff" list in the job summary. `--claims=warn|fail|off` sets how strict it is (default `warn`).
+  - GitHub Action: new `claims` input. It is passed on only when the installed package supports it, so the Action still works with 0.4.
+- The agent skill and guidelines tell agents what to do when the hook warns.
+
 ## 0.4.3 — 2026-10-09
 
 - The `action.yml` description is now under GitHub Marketplace's 125-character limit, so the Action can be listed there. Use `uses: semitexa/laravel-ai-verify@v0.4.3`.
