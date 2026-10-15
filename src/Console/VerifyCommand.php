@@ -289,7 +289,7 @@ final class VerifyCommand extends Command
                 $this->newLine();
                 $scope = $event['requested_scope'] === $event['effective_scope']
                     ? $event['effective_scope']
-                    : "{$event['requested_scope']} → {$event['effective_scope']}";
+                    : "{$event['requested_scope']} -> {$event['effective_scope']}";
                 $this->line("  <options=bold>ai:verify</> · {$event['changed_files']} changed file(s) · scope <fg=cyan>{$scope}</> · {$event['targets']} check(s) · source {$event['source']}");
                 $this->newLine();
                 break;
@@ -316,7 +316,7 @@ final class VerifyCommand extends Command
                 break;
 
             case 'next':
-                $this->line("  <fg=cyan>→</> <options=bold>{$event['cmd']}</> — {$event['why']}");
+                $this->line("  <fg=cyan>-></> <options=bold>{$event['cmd']}</> — {$event['why']}");
                 break;
 
             case 'verdict':

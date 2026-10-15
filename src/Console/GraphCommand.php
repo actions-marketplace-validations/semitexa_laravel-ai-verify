@@ -26,7 +26,7 @@ final class GraphCommand extends Command
         {--human : Human-readable output (default in a terminal)}
         {--full : With --json and no node: dump every node and edge}';
 
-    protected $description = 'Project graph for AI agents: routes → controllers → requests/policies/models/views → tests, events → listeners, impact';
+    protected $description = 'Project graph for AI agents: routes -> controllers -> requests/policies/models/views -> tests, events -> listeners, impact';
 
     private Graph $graph;
 
@@ -272,7 +272,7 @@ final class GraphCommand extends Command
             }
         }
 
-        foreach (['uses' => '→', 'used_by' => '←'] as $key => $arrow) {
+        foreach (['uses' => '->', 'used_by' => '<-'] as $key => $arrow) {
             if ($view[$key] === []) {
                 continue;
             }
@@ -307,7 +307,7 @@ final class GraphCommand extends Command
             $this->line("  <fg=magenta>{$file['band']}</> {$file['path']} <fg=gray>{$file['dependents']} dependents · {$file['routes']} routes · {$file['tests']} tests</>");
 
             foreach ($file['sample'] ?? [] as $id) {
-                $this->line("      <fg=gray>←</> {$id}");
+                $this->line("      <fg=gray><-</> {$id}");
             }
         }
 

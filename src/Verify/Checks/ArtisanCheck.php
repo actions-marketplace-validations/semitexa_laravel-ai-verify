@@ -39,7 +39,7 @@ final class ArtisanCheck implements Check
         'events' => [
             'args' => ['event:list', '--json'],
             'json' => true,
-            'what' => 'event → listener map resolved',
+            'what' => 'event -> listener map resolved',
         ],
     ];
 

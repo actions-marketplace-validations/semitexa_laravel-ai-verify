@@ -18,10 +18,17 @@ Before the agent edits anything, **`php artisan ai:graph`** gives it a **code gr
 app**. It covers routes → controllers → form requests → models → tables → policies → views → tests,
 and events → listeners. It also does impact analysis: what a change affects and which tests cover it.
 
+For PHP 8.3+ and Laravel 12 or 13:
+
 ```bash
 composer require --dev semitexa/laravel-ai-verify
-php artisan ai:verify:install --hook
+php artisan ai:verify:install --hook --git-hook
 ```
+
+`--hook` keeps Claude Code from finishing while `ai:verify` fails. `--git-hook` stamps verified
+commits and warns when a commit message doesn't match its diff ([message vs diff](#message-vs-diff)).
+
+![Tests pass and the commit says "name", but the diff changed the email rule; the git hook flags it before the commit exists](https://raw.githubusercontent.com/semitexa/laravel-ai-verify/main/art/message-vs-diff.gif)
 
 How it works: `ai:verify` reads what changed (uncommitted work, a git ref, or a file list). It
 works out the smallest set of checks that can vouch for that change and runs them with timeouts.
@@ -39,13 +46,14 @@ $ php artisan ai:verify
       › app/Http/Controllers/PostController.php:24 Relation 'comments' is not found in App\Models\Post model.
   ✗ tests:tests/Feature/PostTest.php 1.1s — Tests\Feature\PostTest::test_show_renders_a_post — Expected response status code [200] but received 500. …
       › app/Http/Controllers/PostController.php:24 … RelationNotFoundException: Call to undefined relationship [comments] on model [App\Models\Post].
-  → php artisan test tests/Feature/PostTest.php — reproduce the failing test with full output
+  -> php artisan test tests/Feature/PostTest.php — reproduce the failing test with full output
 
    FAIL  · 3 pass · 2 fail · 0 skipped · 0 incomplete
   5 check(s) over 1 changed file(s); every file was read by at least one check
 ```
 
-Note that this run did **not** execute the whole suite and did **not** run PHPStan on the whole
+The PHPStan line needs Larastan (`composer require --dev larastan/larastan`); without it the
+check is reported as skipped with that install command. Note that this run did **not** execute the whole suite and did **not** run PHPStan on the whole
 app. It followed the change. The edited controller handles `GET /posts/{post}`, and
 `tests/Feature/PostTest.php` requests that URI, so that is the test that runs.
 
@@ -93,12 +101,14 @@ than it sounds:
 
 ## Install
 
+Requires PHP 8.3+ and Laravel 12 or 13.
+
 ```bash
 composer require --dev semitexa/laravel-ai-verify
+composer require --dev larastan/larastan    # optional: enables the PHPStan check
 ```
 
-Requires PHP 8.3+ and Laravel 12 or 13. Larastan and Pint are used when the project has them.
-Pest or PHPUnit is detected automatically.
+Pint ships with Laravel and is used when present. Pest or PHPUnit is detected automatically.
 
 ### Tell your agents
 
@@ -111,7 +121,7 @@ php artisan ai:verify:install --git-hook   # also: verified commits get an AI-Ve
 ```
 
 ```text
-  create    AGENTS.md — Codex, Cursor, Copilot, Amp, Jules, Zed and other AGENTS.md readers
+  append    AGENTS.md — Codex, Cursor, Copilot, Amp, Jules, Zed and other AGENTS.md readers
   append    CLAUDE.md — Claude Code
   create    .claude/skills/ai-verify/SKILL.md — agent skill
   create    .claude/settings.json — Claude Code Stop hook: php "${CLAUDE_PROJECT_DIR}/artisan" ai:verify:hook
@@ -133,7 +143,9 @@ php artisan ai:verify:install --git-hook   # also: verified commits get an AI-Ve
   Boost's `<laravel-boost-guidelines>` block. Boost rewrites only its own block, so the two coexist.
 - **More agents.** `--all` also creates the files for agents the project doesn't use yet.
 - **Undo.** `--remove` takes everything out again, and `--dry-run` shows the plan first.
-- **Commit the files.** Every teammate's agent then gets the same instructions.
+- **Commit the files.** Every teammate's agent then gets the same instructions. The git hook lives
+  in `.git/hooks`, which git doesn't version, so each clone runs `php artisan ai:verify:install --git-hook`
+  once (or add it to `post-install-cmd` in `composer.json`).
 
 **Why the hook.** An agent can ignore an instruction, but it can't ignore a Stop hook. With
 `--hook`, every time Claude Code is about to finish, `ai:verify` checks the uncommitted work. If
@@ -206,10 +218,10 @@ When stdout is not a terminal, which is how agents run commands, the output is N
 per line, results streamed as each check finishes, and the verdict always last.
 
 ```json
-{"kind":"summary","source":"dirty (default)","requested_scope":"standard","effective_scope":"standard","changed_files":1,"targets":4,"tool":"semitexa/laravel-ai-verify 0.5.1"}
+{"kind":"summary","source":"dirty (default)","requested_scope":"standard","effective_scope":"standard","changed_files":1,"targets":4,"tool":"semitexa/laravel-ai-verify 0.5.2"}
 {"kind":"file","file_kind":"listener","path":"app/Listeners/NotifySubscribers.php","status":"M"}
-{"kind":"target","id":"artisan:events","check":"artisan","reason":"event → listener map resolved — listener changed","triggered_by":["app/Listeners/NotifySubscribers.php"],"required":true}
-{"kind":"result","id":"artisan:events","check":"artisan","status":"pass","exit_code":0,"signal":"Event → listener map resolved","required":true,"duration_ms":230}
+{"kind":"target","id":"artisan:events","check":"artisan","reason":"event -> listener map resolved — listener changed","triggered_by":["app/Listeners/NotifySubscribers.php"],"required":true}
+{"kind":"result","id":"artisan:events","check":"artisan","status":"pass","exit_code":0,"signal":"Event -> listener map resolved","required":true,"duration_ms":230}
 {"kind":"result","id":"phpstan","check":"phpstan","status":"pass","exit_code":0,"signal":"PHPStan: no errors in 1 file(s)","required":false,"duration_ms":2632}
 {"kind":"restart","cmd":"php artisan queue:restart","why":"queued code changed — running queue workers still have the old version in memory"}
 {"kind":"next","cmd":"git add -A && git commit","why":"the change set is verified"}
@@ -217,7 +229,7 @@ per line, results streamed as each check finishes, and the verdict always last.
 ```
 
 Event kinds, in order: `summary`, `file`, `impact`, `expansion`, `warning`, `target`, then
-`result` and its `violation` lines, then `restart`, `next` and `verdict`. A violation carries
+`result` and its `violation` lines, then `restart`, `next`, `receipt` and `verdict`. A violation carries
 `path`, `line`, `rule`, `message`, `severity` and, when available, a `tip` with the command that fixes it.
 
 `--json` prints one envelope (schema `semitexa.laravel-ai-verify/v1`) with the same data plus
@@ -349,7 +361,7 @@ jobs:
       - run: composer install --no-interaction --no-progress --prefer-dist
       - run: cp .env.example .env && php artisan key:generate
 
-      - uses: semitexa/laravel-ai-verify@v0.5.1
+      - uses: semitexa/laravel-ai-verify@v0.5.2
         with:
           require: ai             # commits co-authored by an AI agent must be verified
 ```
@@ -419,7 +431,9 @@ affect" is a walk backwards along them.
 - **Every check has a 120 s timeout and a 4 MB output cap.** Hitting either makes the result
   `incomplete`, never `pass`.
 - **Agent output wrappers are bypassed.** `laravel/pao` is switched off for child processes.
-  Results are read from JUnit XML and the tools' JSON formats, never from console text.
+  Results are read from JUnit XML and the tools' JSON formats, never from console text. `ai:verify`'s
+  own messages stay in ASCII where it matters (`2 -> 1`), because pao's cleaner strips arrows and
+  box characters from what the agent sees.
 
 ## Configuration
 

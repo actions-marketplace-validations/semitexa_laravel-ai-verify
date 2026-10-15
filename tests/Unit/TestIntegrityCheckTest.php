@@ -61,6 +61,8 @@ final class TestIntegrityCheckTest extends TestCase
 
         $this->assertSame('fail', $result->status);
         $this->assertSame('test_integrity.assertions_removed', $result->violations[0]->rule);
+        // ASCII on purpose: laravel/pao strips arrows from what an agent reads.
+        $this->assertMatchesRegularExpression('/^Assertion count dropped from \d+ to \d+$/', $result->violations[0]->message);
     }
 
     public function test_removed_test_and_added_skip_fail(): void

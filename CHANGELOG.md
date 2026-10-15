@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.2 - 2026-10-15
+
+- **Readable under laravel/pao.** New Laravel 13 apps ship pao, which strips arrows from what an agent reads, so "Assertion count dropped: 2 → 1" reached agents as "2 1". Messages that carry data now use ASCII ("Assertion count dropped from 2 to 1", "standard -> broad"), as do the hook's next-step lines and the `ai:graph` uses / used-by markers.
+- `ai:verify:install` no longer suggests `--hook` or `--git-hook` when that hook is already installed.
+- README: the quick start installs both hooks (`--hook --git-hook`), so the message vs diff check is on from the start; requirements sit above the first command; Larastan is listed as the optional install that enables the PHPStan check; each clone needs `--git-hook` once, since `.git/hooks` is not versioned; the `receipt` event is in the event list; a short GIF of the message vs diff warning.
+
 ## 0.5.1 - 2026-10-14
 
 - Docs only: the message vs diff notes now say where the mismatched commit came from (Claude Code, while we tested the Action in a test app), that Blade views are searched, that the hook sees messages given with `-m` or `-F` (an editor message is checked in CI), and the exact sample (937 commits, 23 flagged).
