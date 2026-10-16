@@ -12,6 +12,9 @@ inputs:
   require:
     description: 'Which commits must carry a valid AI-Verify trailer: `ai` (co-authored by an AI agent), `all`, or `none` (report only).'
     default: 'ai'
+  claims:
+    description: 'Commit message vs diff: `warn` (annotate commits whose subject names a line they did not change), `fail`, or `off`. Needs the package >= 0.5.'
+    default: 'warn'
   scope:
     description: 'ai:verify scope for the re-run: minimal, standard or broad.'
     default: 'standard'
@@ -73,9 +76,13 @@ runs:
       env:
         BASE: ${{ steps.base.outputs.base }}
         REQUIRE: ${{ inputs.require }}
+        CLAIMS: ${{ inputs.claims }}
       run: |
         set +e
-        php artisan ai:verify:receipt --range="${BASE}..HEAD" --require="$REQUIRE" --github --no-ansi
+        claims=()
+        # --claims arrived in 0.5; an older package in the app would reject the option.
+        if php artisan ai:verify:receipt --help 2>/dev/null | grep -q -- '--claims'; then claims=(--claims="$CLAIMS"); fi
+        php artisan ai:verify:receipt --range="${BASE}..HEAD" --require="$REQUIRE" "${claims[@]}" --github --no-ansi
         code=$?
         if [ $code -eq 0 ]; then echo "result=ok" >> "$GITHUB_OUTPUT"; else echo "result=failed" >> "$GITHUB_OUTPUT"; fi
         exit 0
@@ -110,7 +117,7 @@ runs:
       run: |
         echo "receipts: $RECEIPTS · ai:verify: $VERDICT"
         failed=0
-        if [ "$RECEIPTS" = "failed" ]; then echo "::error title=Laravel AI Verify::Commits without a valid AI-Verify trailer (see the job summary)."; failed=1; fi
+        if [ "$RECEIPTS" = "failed" ]; then echo "::error title=Laravel AI Verify::Commits without a valid AI-Verify trailer, or whose message does not match the diff (see the job summary)."; failed=1; fi
         case "$VERDICT" in
           pass|skipped|not-run) ;;
           *) echo "::error title=Laravel AI Verify::ai:verify verdict: $VERDICT"; failed=1 ;;

@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.5.2 - 2026-10-15
+
+- **Readable under laravel/pao.** New Laravel 13 apps ship pao, which strips arrows from what an agent reads, so "Assertion count dropped: 2 → 1" reached agents as "2 1". Messages that carry data now use ASCII ("Assertion count dropped from 2 to 1", "standard -> broad"), as do the hook's next-step lines and the `ai:graph` uses / used-by markers.
+- `ai:verify:install` no longer suggests `--hook` or `--git-hook` when that hook is already installed.
+- README: the quick start installs both hooks (`--hook --git-hook`), so the message vs diff check is on from the start; requirements sit above the first command; Larastan is listed as the optional install that enables the PHPStan check; each clone needs `--git-hook` once, since `.git/hooks` is not versioned; the `receipt` event is in the event list; a short GIF of the message vs diff warning.
+
+## 0.5.1 - 2026-10-14
+
+- Docs only: the message vs diff notes now say where the mismatched commit came from (Claude Code, while we tested the Action in a test app), that Blade views are searched, that the hook sees messages given with `-m` or `-F` (an editor message is checked in CI), and the exact sample (937 commits, 23 flagged).
+
+## 0.5.0 - 2026-10-14
+
+- **Message vs diff.** A receipt proves the checks passed, not that the commit does what its message says. While we tested the GitHub Action, Claude Code committed "Limit contact name to 250 chars" in our test app, and the diff limited the email. The tests passed and the commit was stamped.
+  - The commit subject is now read against the diff. A subject word that names a line in a changed code file is flagged when that line is unchanged and a line of the same shape next to it changed (`'name' => [...]` left alone, `'email' => [...]` edited). A number in the subject that no added line contains is flagged too.
+  - Only code files are searched (PHP including Blade, JS/TS and other languages), not prose, JSON, YAML, Twig, HTML or tests. Merges, reverts and commits of more than 25 files are skipped. Across 937 commits from five of our PHP repositories it flagged 23 (2.5%).
+  - The `prepare-commit-msg` hook prints the warning on stderr before the commit exists.
+  - `ai:verify:receipt --range` adds `claims` per commit, a warning annotation on the changed line with `--github`, and a "Message vs diff" list in the job summary. `--claims=warn|fail|off` sets how strict it is (default `warn`).
+  - GitHub Action: new `claims` input. It is passed on only when the installed package supports it, so the Action still works with 0.4.
+- The agent skill and guidelines tell agents what to do when the hook warns.
+
 ## 0.4.3 — 2026-10-09
 
 - The `action.yml` description is now under GitHub Marketplace's 125-character limit, so the Action can be listed there. Use `uses: semitexa/laravel-ai-verify@v0.4.3`.

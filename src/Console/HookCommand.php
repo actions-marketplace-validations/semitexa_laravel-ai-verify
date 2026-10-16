@@ -95,7 +95,7 @@ final class HookCommand extends Command
         }
 
         foreach ((array) ($report['next'] ?? []) as $next) {
-            $lines[] = "→ {$next['cmd']} — {$next['why']}";
+            $lines[] = "-> {$next['cmd']} — {$next['why']}";
         }
 
         $lines[] = 'Re-run php artisan ai:verify after fixing. Do not delete or weaken tests to make it pass.';

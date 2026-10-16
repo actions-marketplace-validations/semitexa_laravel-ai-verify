@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Semitexa\LaravelAiVerify\Console;
 
 use Illuminate\Console\Command;
+use Semitexa\LaravelAiVerify\Receipts\CommitClaims;
 use Semitexa\LaravelAiVerify\Receipts\Receipts;
 use Semitexa\LaravelAiVerify\Receipts\Trailer;
 use Semitexa\LaravelAiVerify\Support\GitTree;
@@ -19,6 +20,10 @@ use Semitexa\LaravelAiVerify\Toolkit;
  *   php artisan ai:verify:receipt --trailer          # the AI-Verify trailer for what is staged (used by the git hook)
  *   php artisan ai:verify:receipt --commit=HEAD      # does this commit carry a trailer that matches its tree?
  *   php artisan ai:verify:receipt --range=origin/main..HEAD --require=ai --github   # CI
+ *
+ * Alongside the trailer, each commit's subject is checked against its diff
+ * (see CommitClaims): a receipt proves the checks passed, not that the change
+ * is the one the message describes.
  */
 final class ReceiptCommand extends Command
 {
@@ -31,6 +36,7 @@ final class ReceiptCommand extends Command
         {--range= : Check AI-Verify trailers of every commit in a range, e.g. origin/main..HEAD}
         {--require=ai : With --range/--commit: which commits must be verified — all, ai (written with an AI agent) or none}
         {--github : With --range: GitHub Actions annotations and a job summary}
+        {--claims=warn : Commit message vs diff: warn, fail (a mismatch fails --range) or off}
         {--json : JSON output}';
 
     protected $description = 'Check ai:verify receipts and the AI-Verify commit trailers that carry them to CI';
@@ -115,6 +121,10 @@ final class ReceiptCommand extends Command
         $receipt = $tree !== null ? $this->receipts->forTree($tree) : null;
         $file = $this->option('message-file');
 
+        if (is_string($file) && is_file($file)) {
+            $this->warnAboutClaims((string) file_get_contents($file));
+        }
+
         if ($receipt === null) {
             // An amended commit keeps its old message: a trailer for a different tree must not ride along.
             if (is_string($file) && is_file($file) && ($old = Trailer::parse((string) file_get_contents($file))) !== null && $old['tree'] !== $tree) {
@@ -173,9 +183,38 @@ final class ReceiptCommand extends Command
             ."  Stage everything that was verified (git add -A), or re-run php artisan ai:verify on what you commit.\n");
     }
 
+    /** Tell the committer, before the commit exists, that the message names something the diff left alone. */
+    private function warnAboutClaims(string $message): void
+    {
+        if ($this->claimsMode() === 'off') {
+            return;
+        }
+
+        try {
+            $findings = (new CommitClaims($this->toolkit->runner))->staged($message);
+        } catch (\Throwable) {
+            return; // a hook must never block a commit over its own failure
+        }
+
+        if ($findings === []) {
+            return;
+        }
+
+        fwrite(STDERR, "ai-verify: the commit message may not describe this change:\n"
+            .implode("\n", array_map(static fn (array $f) => '  '.$f['message'], $findings))."\n"
+            ."  If the change is right, say what it does; if the message is right, change the code (git commit --amend).\n");
+    }
+
+    private function claimsMode(): string
+    {
+        return in_array($this->option('claims'), ['warn', 'fail', 'off'], true) ? (string) $this->option('claims') : 'warn';
+    }
+
     private function range(string $range, bool $single = false): int
     {
         $require = in_array($this->option('require'), ['all', 'ai', 'none'], true) ? (string) $this->option('require') : 'ai';
+        $claimsMode = $this->claimsMode();
+        $claims = new CommitClaims($this->toolkit->runner);
         $args = $single ? ['-1', $range] : [$range];
         $log = $this->toolkit->runner->run(['git', 'log', '--no-merges', '--format=%H%x1f%T%x1f%s%x1f%B%x1e', ...$args, '--']);
 
@@ -206,17 +245,21 @@ final class ReceiptCommand extends Command
                 'receipt' => $trailer['id'] ?? null,
                 'scope' => $trailer['scope'] ?? null,
                 'checks' => $trailer['checks'] ?? null,
+                'claims' => $claimsMode === 'off' ? [] : $claims->commit($sha, $subject),
             ];
         }
 
         $failing = array_values(array_filter($commits, static fn (array $c) => $c['required'] && $c['status'] !== 'verified'));
+        $mismatched = count(array_filter($commits, static fn (array $c) => $c['claims'] !== []));
         $summary = [
             'range' => $range,
             'require' => $require,
             'commits' => count($commits),
             'verified' => count(array_filter($commits, static fn (array $c) => $c['status'] === 'verified')),
             'failing' => count($failing),
-            'ok' => $failing === [],
+            'claims' => $claimsMode,
+            'mismatched' => $mismatched,
+            'ok' => $failing === [] && ($claimsMode !== 'fail' || $mismatched === 0),
         ];
 
         if ($this->option('github')) {
@@ -239,10 +282,15 @@ final class ReceiptCommand extends Command
                     default => 'no AI-Verify trailer'.($c['ai'] ? ' (AI-assisted commit)' : ''),
                 };
                 $this->line("  <fg={$color}>{$icon}</> ".substr($c['sha'], 0, 8)." {$c['subject']} <fg=gray>— {$why}</>");
+
+                foreach ($c['claims'] as $f) {
+                    $this->line('      <fg='.($summary['claims'] === 'fail' ? 'red' : 'yellow').">message vs diff</> {$f['message']}");
+                }
             }
 
             $this->newLine();
-            $this->line('  '.($summary['ok'] ? '<fg=green>OK</>' : '<fg=red>FAIL</>')." · {$summary['verified']}/{$summary['commits']} commit(s) verified · require={$summary['require']}");
+            $this->line('  '.($summary['ok'] ? '<fg=green>OK</>' : '<fg=red>FAIL</>')." · {$summary['verified']}/{$summary['commits']} commit(s) verified · require={$summary['require']}"
+                .($summary['mismatched'] > 0 ? " · {$summary['mismatched']} message(s) vs diff" : ''));
             $this->newLine();
         }, $summary['ok'] ? 0 : 1);
     }
@@ -257,6 +305,12 @@ final class ReceiptCommand extends Command
             if ($c['required'] && $c['status'] !== 'verified') {
                 $this->line(sprintf('::error title=Unverified commit %s::%s — %s', substr($c['sha'], 0, 8), $c['subject'],
                     $c['status'] === 'stale' ? 'changed after ai:verify ran' : ($c['status'] === 'not_pass' ? 'ai:verify did not pass' : 'no AI-Verify trailer; run php artisan ai:verify before committing')));
+            }
+
+            foreach ($c['claims'] as $f) {
+                $this->line(sprintf('::%s file=%s,line=%d,title=Commit %s: message vs diff::%s',
+                    $summary['claims'] === 'fail' ? 'error' : 'warning', $f['changed']['path'], $f['changed']['line'],
+                    substr($c['sha'], 0, 8), self::annotation($c['subject'].': '.$f['message'])));
             }
         }
 
@@ -276,7 +330,25 @@ final class ReceiptCommand extends Command
         $md = "### ai:verify receipts\n\n".($summary['ok'] ? '✅' : '❌')." {$summary['verified']}/{$summary['commits']} commit(s) verified · require `{$summary['require']}`\n\n"
             ."| | Commit | | Receipt |\n|---|---|---|---|\n".implode("\n", $rows)."\n";
 
+        $claims = [];
+
+        foreach ($commits as $c) {
+            foreach ($c['claims'] as $f) {
+                $claims[] = sprintf('- `%s` %s: %s', substr($c['sha'], 0, 8), str_replace('|', '\\|', $c['subject']), $f['message']);
+            }
+        }
+
+        if ($claims !== []) {
+            $md .= "\n#### Message vs diff\n\nThe subject names something the change did not touch. Check that the commit does what it says.\n\n".implode("\n", $claims)."\n";
+        }
+
         @file_put_contents($file, $md, FILE_APPEND);
+    }
+
+    /** Workflow-command data must not carry raw newlines or percent signs. */
+    private static function annotation(string $text): string
+    {
+        return str_replace(['%', "\r", "\n"], ['%25', '%0D', '%0A'], $text);
     }
 
     /** @param array<string, mixed> $data */

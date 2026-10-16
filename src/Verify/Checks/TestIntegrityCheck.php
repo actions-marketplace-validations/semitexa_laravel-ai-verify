@@ -91,7 +91,7 @@ final class TestIntegrityCheck implements Check
             $now = $this->count($pattern, $after);
 
             if ($now < $was) {
-                $found[] = new Violation("{$label}: {$was} → {$now}", $file, null, $rule, tip: $tip);
+                $found[] = new Violation("{$label} from {$was} to {$now}", $file, null, $rule, tip: $tip);
             }
         }
 
@@ -99,7 +99,7 @@ final class TestIntegrityCheck implements Check
         $skipsNow = $this->count(self::SKIP, $after);
 
         if ($skipsNow > $skipsWas) {
-            $found[] = new Violation("Skip/todo/only markers added: {$skipsWas} → {$skipsNow}", $file, null, 'test_integrity.skip_added', tip: $tip);
+            $found[] = new Violation("Skip/todo/only markers went from {$skipsWas} to {$skipsNow}", $file, null, 'test_integrity.skip_added', tip: $tip);
         }
 
         return $found;

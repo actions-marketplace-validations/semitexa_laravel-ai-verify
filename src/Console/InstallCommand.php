@@ -46,7 +46,7 @@ final class InstallCommand extends Command
         $this->newLine();
 
         if (! $remove && $instructions->managedByBoost() && ! $this->option('force')) {
-            $this->line('  <fg=green>✓</> Laravel Boost already ships the ai:verify guideline and skill (boost.json → packages).');
+            $this->line('  <fg=green>✓</> Laravel Boost already ships the ai:verify guideline and skill ("packages" in boost.json).');
             $this->line('    <fg=gray>Re-run php artisan boost:install to refresh them; use --force to write our own block as well.</>');
             $actions = [];
         } else {
@@ -100,11 +100,11 @@ final class InstallCommand extends Command
         if (! $remove) {
             $this->line('  Agents will now run <options=bold>php artisan ai:verify</> before calling a change done.');
 
-            if (! $withHook) {
+            if (! $withHook && ! $hook->installed()) {
                 $this->line('  <fg=gray>Using Claude Code? Add --hook to make it non-optional: Claude cannot finish while verify fails.</>');
             }
 
-            if (! $withGitHook) {
+            if (! $withGitHook && ! $gitHook->installed()) {
                 $this->line('  <fg=gray>Add --git-hook to stamp verified commits with an AI-Verify trailer that CI can check.</>');
             }
 
