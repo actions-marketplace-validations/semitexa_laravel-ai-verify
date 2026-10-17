@@ -55,7 +55,11 @@
         "illuminate/support": "^12.0|^13.0",
         "symfony/process": "^7.2|^8.0"
     },
+    "suggest": {
+        "laravel/boost": "Offers ai-verify, ai-graph and ai-verify-receipt as MCP tools in Boost's MCP server"
+    },
     "require-dev": {
+        "laravel/mcp": "^1.0",
         "orchestra/testbench": "^10.0|^11.0",
         "phpunit/phpunit": "^11.5|^12.0"
     },

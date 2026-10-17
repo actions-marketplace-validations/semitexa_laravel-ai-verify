@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.0 - 2026-10-17
+
+- **MCP tools in Laravel Boost.** With Boost installed, its MCP server now offers `ai-verify`, `ai-graph` and `ai-verify-receipt` next to its own tools, so agents can ask for a verdict, a graph node or an impact report as a tool call instead of a shell command. They return the same JSON as the commands with `--json`; a `fail` verdict is an answer, not a tool error. Boost runs each call in a fresh process, so the tools always see the agent's latest edits. `ai-verify` takes `timeout` for long suites (Boost's default is 180 seconds).
+- Registered through Boost's own `boost.mcp.tools.include` list, only when `laravel/mcp` is installed; nothing changes without Boost. Opt out with `AI_VERIFY_MCP_BOOST=false` or `ai-verify.mcp.boost`.
+- The guideline and the agent skill name the tools.
+
 ## 0.5.2 - 2026-10-15
 
 - **Readable under laravel/pao.** New Laravel 13 apps ship pao, which strips arrows from what an agent reads, so "Assertion count dropped: 2 → 1" reached agents as "2 1". Messages that carry data now use ASCII ("Assertion count dropped from 2 to 1", "standard -> broad"), as do the hook's next-step lines and the `ai:graph` uses / used-by markers.

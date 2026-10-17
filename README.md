@@ -418,6 +418,34 @@ The graph has two layers:
 Edges point from the thing that depends to the thing it depends on, so "what does this change
 affect" is a walk backwards along them.
 
+## MCP tools in Laravel Boost
+
+If the app uses [Laravel Boost](https://github.com/laravel/boost), its MCP server offers three more
+tools as soon as this package is installed, next to Boost's own:
+
+| Tool | Same as | Arguments |
+|---|---|---|
+| `ai-verify` | `php artisan ai:verify --json` | `files`, `git_ref`, `scope`, `timeout` |
+| `ai-graph` | `php artisan ai:graph --json` | `node`, `impact` |
+| `ai-verify-receipt` | `php artisan ai:verify:receipt --json` | `id`, `unread` |
+
+An agent connected to Boost (Claude Code, Cursor, Codex, Copilot, Junie, …) can then ask for a
+verdict, a graph node or an impact report as a tool call instead of a shell command:
+
+```text
+ai-verify  {"files": ["app/Http/Requests/StoreContactMessageRequest.php"]}
+→ {"schema":"semitexa.laravel-ai-verify/v1","verdict":"pass","counts":{"pass":4,"fail":0,"skipped":1,"incomplete":0}, …}
+```
+
+- **Same answers.** Each tool runs the command with `--json` and returns its JSON unchanged. A
+  `fail` verdict is a normal answer with the violations in it, not a tool error.
+- **Fresh every call.** Boost runs every tool call in a new process, so the tools see the agent's
+  latest edits.
+- **Long suites.** Boost stops a tool after 180 seconds by default. `ai-verify` takes `timeout`
+  for a broad run, or set `boost.mcp.tool_timeout`.
+- **Opt out.** The tools join Boost's `boost.mcp.tools.include` list only when `laravel/mcp` is
+  installed. `AI_VERIFY_MCP_BOOST=false` keeps them out.
+
 ## Safety
 
 - **Nothing is written to `bootstrap/cache`.** Config, route and event cache paths are redirected
@@ -459,7 +487,7 @@ return [
 
 | Tool | What it does | How this package uses it |
 |---|---|---|
-| **Laravel Boost** | Gives agents docs, schema and logs through MCP, plus guidelines | Complementary. This package ships a Boost guideline and skill, so `boost:install` teaches agents to verify. |
+| **Laravel Boost** | Gives agents docs, schema and logs through MCP, plus guidelines | Complementary. This package ships a Boost guideline and skill, so `boost:install` teaches agents to verify, and adds its checks to Boost's MCP server as tools. |
 | **Pest / PHPUnit** | Run tests | Used as the runner. Results are read from JUnit XML. |
 | **Pest `--tia`** | Coverage-based test selection | A different trade-off: the graph needs no coverage driver and no baseline. |
 | **laravel/pao** | Compresses tool output for agents | Bypassed for child processes, so the structured reports stay parseable. |
@@ -539,7 +567,8 @@ touched files, and Pint fixers the file already needed, are reported as `pre-exi
 
 ### Does it work with Laravel Boost, Pest 4/5, PHPUnit, Octane, Horizon?
 
-Yes. It ships a Boost guideline and skill. It runs Pest or PHPUnit and reads their JUnit output.
+Yes. It ships a Boost guideline and skill, and adds `ai-verify`, `ai-graph` and
+`ai-verify-receipt` to Boost's MCP server as tools. It runs Pest or PHPUnit and reads their JUnit output.
 After a change it tells the agent when to run `queue:restart`, `horizon:terminate` or
 `octane:reload`.
 
