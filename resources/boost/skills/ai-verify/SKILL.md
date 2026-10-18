@@ -14,6 +14,18 @@ description: Verify a Laravel change before calling it done, and orient in an un
 5. On `incomplete`, don't claim success. Check `unchecked_files` (nothing read those files) and any `result` with `status: incomplete` (timeout, crash, or a required tool missing). Fix the cause, or tell the user exactly what could not be verified.
 6. On `pass`, follow any `restart` hints (`queue:restart`, `octane:reload`, `config:clear`) before testing in a browser.
 
+## As MCP tools (Laravel Boost)
+
+If Laravel Boost's MCP server is connected, the commands are also tools, with the same JSON the commands print with `--json`:
+
+| Tool | Same as | Arguments |
+|---|---|---|
+| `ai-verify` | `php artisan ai:verify --json` | `files`, `git_ref`, `scope`, `timeout` (seconds, for long suites) |
+| `ai-graph` | `php artisan ai:graph --json` | `node`, `impact` |
+| `ai-verify-receipt` | `php artisan ai:verify:receipt --json` | `id`, `unread` |
+
+A `fail` verdict is a normal answer, not a tool error: read `violations`, fix them and call `ai-verify` again.
+
 ## Receipts and commits
 
 - Every run writes a receipt (`{"kind":"receipt","id":"rcpt-…"}`). `php artisan ai:verify:receipt` shows whether it still **holds**: it is intact, the verdict was `pass`, and nothing changed since. Check it before claiming the work is verified.

@@ -96,4 +96,19 @@ return [
 
     'kinds' => [],
 
+    /*
+    |--------------------------------------------------------------------------
+    | MCP tools
+    |--------------------------------------------------------------------------
+    |
+    | With Laravel Boost installed, ai-verify, ai-graph and ai-verify-receipt
+    | are added to Boost's MCP server, so agents can call them as tools.
+    | Set to false to keep them out of Boost.
+    |
+    */
+
+    'mcp' => [
+        'boost' => env('AI_VERIFY_MCP_BOOST', true),
+    ],
+
 ];

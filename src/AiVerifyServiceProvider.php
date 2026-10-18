@@ -14,6 +14,9 @@ use Semitexa\LaravelAiVerify\Console\InstallCommand;
 use Semitexa\LaravelAiVerify\Console\MigrationProbeCommand;
 use Semitexa\LaravelAiVerify\Console\ReceiptCommand;
 use Semitexa\LaravelAiVerify\Console\VerifyCommand;
+use Semitexa\LaravelAiVerify\Mcp\Tools\AiGraph;
+use Semitexa\LaravelAiVerify\Mcp\Tools\AiVerify;
+use Semitexa\LaravelAiVerify\Mcp\Tools\AiVerifyReceipt;
 use Semitexa\LaravelAiVerify\Support\Workspace;
 
 final class AiVerifyServiceProvider extends ServiceProvider
@@ -32,6 +35,8 @@ final class AiVerifyServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__.'/../config/ai-verify.php' => config_path('ai-verify.php'),
         ], 'ai-verify-config');
+
+        $this->registerBoostTools();
 
         $this->commands([
             VerifyCommand::class,
@@ -57,5 +62,28 @@ final class AiVerifyServiceProvider extends ServiceProvider
                 'Verify' => 'php artisan ai:verify',
             ];
         });
+    }
+
+    /**
+     * Adds ai-verify, ai-graph and ai-verify-receipt to Laravel Boost's MCP
+     * server, the same way Boost takes extra tools from an app's config.
+     * Without laravel/mcp (Boost's MCP layer) the tool classes could not even
+     * load, so nothing is registered.
+     */
+    private function registerBoostTools(): void
+    {
+        if (! class_exists(\Laravel\Mcp\Server\Tool::class) || ! config('ai-verify.mcp.boost', true)) {
+            return;
+        }
+
+        $include = (array) config('boost.mcp.tools.include', []);
+
+        foreach ([AiVerify::class, AiGraph::class, AiVerifyReceipt::class] as $tool) {
+            if (! in_array($tool, $include, true)) {
+                $include[] = $tool;
+            }
+        }
+
+        config()->set('boost.mcp.tools.include', $include);
     }
 }
